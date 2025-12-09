@@ -22,7 +22,7 @@ export const detectVersionMismatch = (response: Response, kv: KVNamespace): Effe
     wantVersion: string | null;
     gotVersion: string | null;
 }, Error> => {
-    Effect.gen(function* () {
+    return Effect.gen(function* () {
         const gotVersion = response.headers.get("x-version");
         const projectId = response.headers.get("x-vercel-project-id");
 
