@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { Env } from "./types";
+import type { Env } from "../types";
 
 // refer: https://www.mintlify.com/blog/page-speed-improvements#2-automatic-version-detection-and-revalidation
 

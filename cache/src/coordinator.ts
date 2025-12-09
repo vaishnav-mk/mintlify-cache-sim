@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { Effect, pipe } from "effect";
 import { DeploymentConfig, LockState } from "./types";
 import { REVALIDATION_LOCK_TIMEOUT } from "./constants";
-import { setDeploymentVersion } from "./version";
+import { setDeploymentVersion } from "./effects/version";
 
 export class RevalidationCoordinator extends DurableObject<Env> {
     async startRevalidation(config: DeploymentConfig): Promise<{status: string; message: string}> {

@@ -23,7 +23,7 @@ export const ContentType = Schema.Literal("html", "rsc");
 export type ContentType = Schema.Schema.Type<typeof ContentType>;
 
 export interface Env {
-  KV: KVNamespace;
+  CACHE_KV: KVNamespace;
   COORDINATOR: DurableObjectNamespace;
   ORIGIN_URL: string;
 }
