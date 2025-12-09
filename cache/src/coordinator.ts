@@ -7,7 +7,21 @@ import { chunks } from "./utils";
 import { warmPath } from "./effects/cache";
 
 export class RevalidationCoordinator extends DurableObject<Env> {
-    async startRevalidation(config: DeploymentConfig): Promise<{status: string; message: string}> {
+    private docVersion: string | null = null;
+
+    async updateDocVersion(deploymentId: string): Promise<void> {
+        this.docVersion = deploymentId;
+        await this.ctx.storage.put("docVersion", deploymentId);
+    }
+
+    async getDocVersion(): Promise<string | null> {
+        if (this.docVersion) return this.docVersion;
+        const stored = await this.ctx.storage.get<string>("docVersion");
+        this.docVersion = stored ?? null;
+        return this.docVersion;
+    }
+
+    async startRevalidation(config: DeploymentConfig, paths?: string[]): Promise<{status: string; message: string}> {
         console.log("[Coordinator] startRevalidation called with config:", JSON.stringify(config));
         const self = this;
         const program = Effect.gen(function* () {
@@ -34,11 +48,10 @@ export class RevalidationCoordinator extends DurableObject<Env> {
             console.log("[Coordinator] Acquiring lock for deployment:", config.deploymentId);
             yield* self.acquireLock(config.deploymentId);
 
-            console.log("[Coordinator] Fetching sitemap from:", config.originUrl);
-            const paths = yield* self.fetchSitemap(config.originUrl);
-            console.log("[Coordinator] Fetched", paths.length, "paths:", paths);
+            const pathsToWarm = paths ?? (yield* self.fetchSitemap(config.originUrl));
+            console.log("[Coordinator] Fetched", pathsToWarm.length, "paths:", pathsToWarm);
 
-            const batches = chunks(paths, BATCH_SIZE);
+            const batches = chunks(pathsToWarm, BATCH_SIZE);
             let warmedCount = 0;
             console.log("[Coordinator] Split into", batches.length, "batches of size", BATCH_SIZE);
 
@@ -50,13 +63,24 @@ export class RevalidationCoordinator extends DurableObject<Env> {
                 )
                 
                 warmedCount += batch.length
-                console.log("[Coordinator] Warmed", warmedCount, "/", paths.length, "paths");
+                console.log("[Coordinator] Warmed", warmedCount, "/", pathsToWarm.length, "paths");
                 
-                yield* self.updateLockProgress(config.deploymentId, paths.length, warmedCount)
+                yield* self.updateLockProgress(config.deploymentId, pathsToWarm.length, warmedCount)
             }
 
+            const currentDocVersion = yield* Effect.tryPromise({
+                try: () => self.getDocVersion(),
+                catch: (error) => new Error(`Failed to get doc version: ${String(error)}`)
+            });
 
-            // TODO: some fn ill create later to double check version hasnt changed during warming
+            if (currentDocVersion && currentDocVersion !== config.deploymentId) {
+                console.log("[Coordinator] Version changed during warming, skipping KV update");
+                yield* self.unlock();
+                return {
+                    status: "SKIPPED",
+                    message: "A newer version was deployed during warming."
+                };
+            }
 
             console.log("[Coordinator] Setting deployment version for domain:", config.domain, "deploymentId:", config.deploymentId);
             yield* setDeploymentVersion(self.env.CACHE_KV, config.domain, config.deploymentId);
