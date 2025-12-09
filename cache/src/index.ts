@@ -81,3 +81,36 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 
 	return Effect.runPromise(program);
 }
+
+async function triggerRevalidation(env: Env, config: DeploymentConfig): Promise<void> {
+  const program = Effect.gen(function* () {
+    const doId = env.COORDINATOR.idFromName(`revalidation:${config.projectId}`)
+    const doStub = env.COORDINATOR.get(doId)
+    
+    const result = yield* Effect.tryPromise({
+      try: () => doStub.startRevalidation(config),
+      catch: (error) => new Error(`Revalidation failed: ${error}`)
+    })
+    
+    console.log("Revalidation result:", result)
+  })
+  
+  await Effect.runPromise(program)
+}
+
+async function handlePrewarm(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const program = Effect.gen(function* () {
+    const config: DeploymentConfig = yield* Effect.tryPromise({
+      try: () => request.json() as Promise<DeploymentConfig>,
+      catch: (error) => new Error(`Invalid request body: ${error}`)
+    })
+    
+    ctx.waitUntil(triggerRevalidation(env, config))
+    
+    return new Response(JSON.stringify({ status: "queued" }), {
+      headers: { "Content-Type": "application/json" }
+    })
+  })
+  
+  return Effect.runPromise(program)
+}
