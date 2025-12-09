@@ -1,0 +1,1 @@
+export const REVALIDATION_LOCK_TIMEOUT = 15 * 60 * 1000; // 15 minutes
