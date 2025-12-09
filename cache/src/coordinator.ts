@@ -45,8 +45,8 @@ export class RevalidationCoordinator extends DurableObject<Env> {
             for (const batch of batches) {
                 console.log("[Coordinator] Warming batch:", batch);
                 yield* Effect.all(
-                batch.map(path => warmPath(config.originUrl, path, config.deploymentId, config.cachePrefix)),
-                { concurrency: BATCH_SIZE }
+                    batch.map(path => warmPath(config.originUrl, path, config.deploymentId, config.cachePrefix)),
+                    { concurrency: BATCH_SIZE }
                 )
                 
                 warmedCount += batch.length
@@ -135,13 +135,14 @@ export class RevalidationCoordinator extends DurableObject<Env> {
         console.log("[Coordinator] fetchSitemap() called for originUrl:", originUrl);
         return Effect.tryPromise({
             try: async () => {
-                // i should make the api call here, will do it later
-                const response = ['https://docs.example.com/docs', 'https://docs.example.com/docs/drivers/hamilton'];
-                console.log("[Coordinator] fetchSitemap() returning mock paths:", response);
-                return response
-                // will pipe and do retries later
+                const response = await fetch(`${originUrl}/api/sitemap`)
+                const data = await response.json() as { paths: Array<string> }
+                console.log("[Coordinator] fetchSitemap() returning mock paths:", data);
+                return data.paths
             },
             catch: (error) => new Error(`Failed to fetch sitemap: ${String(error)}`),
-        });
+        }).pipe(
+            Effect.retry({ times: 3 })
+        )
     }
 }

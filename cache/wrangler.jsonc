@@ -47,7 +47,8 @@
   "kv_namespaces": [
     {
       "binding": "CACHE_KV",
-      "id": "7a4aacba97f943b197f0b0497ec6dda4"
+      "id": "7a4aacba97f943b197f0b0497ec6dda4",
+      "remote": false
     }
   ],
 	/**
