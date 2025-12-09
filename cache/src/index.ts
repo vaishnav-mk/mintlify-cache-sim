@@ -13,7 +13,7 @@ export default {
 	const url = new URL(request.url);
 
 	if (url.pathname == '/prewarm') {
-		// dea; with prewarming here
+		return handlePrewarm(request, env, ctx);
 	}
 
 	// essentially the main thing that sits in front of everything
@@ -27,16 +27,22 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		const url = new URL(request.url);
 		const host = request.headers.get("host") ?? "UNKNOWN"; // honestly not sure when this would be missing
 		
+		console.log("Handling request for host:", host, "path:", url.pathname);
+
 		const cachePrefix = "docs";
 		const projectId = "default_project"; // TODO: multi project support later
 
+		console.log("Using cache prefix:", cachePrefix, "and project ID:", projectId);
 		const deploymentId = yield* Effect.tryPromise({
 			try: () => env.CACHE_KV.get<string>(`DEPLOY:${host}`),
 			catch: (err) => new Error(`Failed to get deployment ID from KV: ${String(err)}`)
 		});
 
+		console.log("Resolved deployment ID:", deploymentId);
+
 		if (!deploymentId) {
 			// ig this is when there are no deployments so it'll just proxy to origin
+			console.log("No deployment ID found, proxying to origin");
 			return yield* Effect.tryPromise({
 				try: () => fetch(env.ORIGIN_URL + url.pathname),
 				catch: (err) => new Error(`Failed to proxy to origin: ${String(err)}`)
@@ -62,8 +68,10 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 			originResponse,
 			env.CACHE_KV,
 		);
+		console.log("Version check result:", versionCheck);
 
 		if (versionCheck.shouldRevalidate && versionCheck.wantVersion) {
+			console.log("Version mismatch detected, triggering revalidation");
 			// this is bg revalidation trigger (no queueing for now cause im broke)
 			ctx.waitUntil(
 				triggerRevalidation(env, {
@@ -88,7 +96,10 @@ async function triggerRevalidation(env: Env, config: DeploymentConfig): Promise<
     const doStub = env.COORDINATOR.get(doId)
     
     const result = yield* Effect.tryPromise({
-      try: () => doStub.startRevalidation(config),
+      try: () => {
+		console.log("Triggering revalidation for deployment:", config.deploymentId)
+		return doStub.startRevalidation(config)
+	  },
       catch: (error) => new Error(`Revalidation failed: ${error}`)
     })
     

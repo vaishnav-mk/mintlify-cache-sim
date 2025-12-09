@@ -8,8 +8,9 @@ import { warmPath } from "./effects/cache";
 
 export class RevalidationCoordinator extends DurableObject<Env> {
     async startRevalidation(config: DeploymentConfig): Promise<{status: string; message: string}> {
-        const program = Effect.gen(function* (this: RevalidationCoordinator) {
-            const existingLock = yield* this.getLock();
+        const self = this;
+        const program = Effect.gen(function* () {
+            const existingLock = yield* self.getLock();
             if (existingLock) {
                 if (Date.now() - existingLock.timestamp < REVALIDATION_LOCK_TIMEOUT) {
                     return {
@@ -18,12 +19,12 @@ export class RevalidationCoordinator extends DurableObject<Env> {
                     }
                 }
 
-                yield* this.unlock(); // stale lock after REVALIDATION_LOCK_TIMEOUT, unlock it as there's no way it'll go on forever
+                yield* self.unlock(); // stale lock after REVALIDATION_LOCK_TIMEOUT, unlock it as there's no way it'll go on forever
             }
 
-            yield* this.acquireLock(config.deploymentId);
+            yield* self.acquireLock(config.deploymentId);
 
-            const paths = yield* this.fetchSitemap(config.originUrl);
+            const paths = yield* self.fetchSitemap(config.originUrl);
 
             const batches = chunks(paths, BATCH_SIZE);
             let warmedCount = 0;
@@ -36,15 +37,15 @@ export class RevalidationCoordinator extends DurableObject<Env> {
                 
                 warmedCount += batch.length
                 
-                yield* this.updateLockProgress(config.deploymentId, paths.length, warmedCount)
+                yield* self.updateLockProgress(config.deploymentId, paths.length, warmedCount)
             }
 
 
             // TODO: some fn ill create later to double check version hasnt changed during warming
 
-            yield* setDeploymentVersion(this.env.CACHE_KV, config.domain, config.deploymentId);
+            yield* setDeploymentVersion(self.env.CACHE_KV, config.domain, config.deploymentId);
 
-            yield* this.unlock();
+            yield* self.unlock();
 
             return {
                 status: "COMPLETED",
