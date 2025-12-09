@@ -1,0 +1,17 @@
+# Robots.txt for F1 Racing Encyclopedia
+
+User-agent: *
+Allow: /
+Allow: /docs/
+Allow: /docs/teams-drivers/
+Allow: /docs/circuits/
+Allow: /docs/f1-guide/
+Allow: /docs/competitions/
+
+# Disallow admin and private pages
+Disallow: /api/
+Disallow: /admin/
+Disallow: /.next/
+
+# Sitemap location
+Sitemap: https://docs.example.com/sitemap.xml
