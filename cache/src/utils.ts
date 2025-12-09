@@ -7,7 +7,7 @@ export function buildCacheKey(
     path: string,
     contentType: ContentType
 ): string {
-    return `${prefix}/${deploymentId}/${path}/${contentType}`;
+    return `${prefix}/${deploymentId}${path}#:${contentType}`;
 }
 
 export function chunks<T>(array: Array<T>, size: number): Array<Array<T>> {

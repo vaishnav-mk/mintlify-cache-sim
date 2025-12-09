@@ -10,6 +10,13 @@ export const getExpectedVersion = (kv: KVNamespace, projectId: string): Effect.E
   });
 }
 
+export const setExpectedVersion = (kv: KVNamespace, projectId: string, deploymentId: string): Effect.Effect<void, Error> => {
+  return Effect.tryPromise({
+    try: () => kv.put(`DEPLOY:${projectId}:id`, deploymentId),
+    catch: (error) => new Error(`Failed to set expected version: ${String(error)}`),
+  });
+}
+
 export const setDeploymentVersion = (kv: KVNamespace, domain: string, deploymentId: string): Effect.Effect<void, Error> => {
   return Effect.tryPromise({
     try: () => kv.put(`DEPLOY:${domain}`, deploymentId),

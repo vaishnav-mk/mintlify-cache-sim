@@ -27,3 +27,36 @@ export interface Env {
   COORDINATOR: DurableObjectNamespace;
   ORIGIN_URL: string;
 }
+
+export interface PrewarmRequest {
+  paths: string[];
+  cachePrefix: string;
+  deploymentId: string;
+  isPrewarm: boolean;
+  originUrl: string;
+  projectId: string;
+  domain: string;
+}
+
+export interface WebhookRequest {
+  type: string;
+  payload: {
+    team: { id: string } | null;
+    user: { id: string };
+    alias: string[];
+    deployment: {
+      id: string;
+      meta: Record<string, string>;
+      url: string;
+      name: string;
+    };
+    links: {
+      deployment: string;
+      project: string;
+    };
+    target: "production" | "staging" | null;
+    project: { id: string };
+    plan: string;
+    regions: string[];
+  };
+}
