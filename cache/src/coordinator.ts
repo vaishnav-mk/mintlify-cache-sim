@@ -32,6 +32,18 @@ export class RevalidationCoordinator extends DurableObject<Env> {
 
                 // updatelockprogress
             }
+
+
+            // TODO: some fn ill create later to double check version hasnt changed during warming
+
+            yield* setDeploymentVersion(this.env.CACHE_KV, config.domain, config.deploymentId);
+
+            yield* this.unlock();
+
+            return {
+                status: "COMPLETED",
+                message: `Revalidation completed. Warmed ${warmedCount} paths.`
+            }
         })
 
         return Effect.runPromise(program);
