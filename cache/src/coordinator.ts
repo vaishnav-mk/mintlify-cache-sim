@@ -1,8 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import { Effect, pipe } from "effect";
-import { DeploymentConfig, LockState } from "./types";
-import { REVALIDATION_LOCK_TIMEOUT } from "./constants";
+import { DeploymentConfig, LockState, Env } from "./types";
+import { BATCH_SIZE, REVALIDATION_LOCK_TIMEOUT } from "./constants";
 import { setDeploymentVersion } from "./effects/version";
+import { chunks } from "./utils";
+import { warmPath } from "./effects/cache";
 
 export class RevalidationCoordinator extends DurableObject<Env> {
     async startRevalidation(config: DeploymentConfig): Promise<{status: string; message: string}> {
@@ -23,15 +25,18 @@ export class RevalidationCoordinator extends DurableObject<Env> {
 
             const paths = yield* this.fetchSitemap(config.originUrl);
 
-            const batches = []; // ill chunk them later
+            const batches = chunks(paths, BATCH_SIZE);
             let warmedCount = 0;
 
             for (const batch of batches) {
-                // warm path
-                warmedCount += batch.length;
-
-
-                // updatelockprogress
+                yield* Effect.all(
+                batch.map(path => warmPath(config.originUrl, path, config.deploymentId, config.cachePrefix)),
+                { concurrency: BATCH_SIZE }
+                )
+                
+                warmedCount += batch.length
+                
+                yield* this.updateLockProgress(config.deploymentId, paths.length, warmedCount)
             }
 
 
@@ -69,6 +74,22 @@ export class RevalidationCoordinator extends DurableObject<Env> {
                 return data ?? null;
             },
             catch: (error) => new Error(`Failed to get lock state: ${String(error)}`),
+        })
+    }
+    
+    private updateLockProgress(
+        deploymentId: string,
+        total: number,
+        warmed: number
+    ): Effect.Effect<void, Error> {
+        return Effect.tryPromise({
+        try: () => this.ctx.storage.put<LockState>("lock", {
+            deploymentId,
+            timestamp: Date.now(),
+            pathsTotal: total,
+            pathsWarmed: warmed
+        }),
+        catch: (error) => new Error(`Failed to update lock: ${error}`)
         })
     }
 
