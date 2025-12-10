@@ -2,7 +2,7 @@
 
 WIP reproduction of [mintlify's edge caching architecture](https://www.mintlify.com/blog/page-speed-improvements) (still WIP and im fixing logical bugs)
 
-a solid write-up on how mintlify uses cloudflare and vercel together got me curious, so i recreated their architecture based on that blog. the mintlify team has been super helpful and this is my take on the same approach
+a solid write-up on how mintlify uses cloudflare and vercel together got me curious, so i recreated their architecture based on that blog. the mintlify team has been super helpful and this is my take on the same approach with a little bit of ✨ [Effect](https://effect.website/) ✨ magic
 
 took a couple of liberties
 - blog approach: cloudflare queues → this repo: durable objects → queues need paid plan & im bork
