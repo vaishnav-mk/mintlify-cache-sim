@@ -40,7 +40,7 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 
 		console.log("Using cache prefix:", cachePrefix, "and project ID:", projectId);
 		const deploymentId = yield* Effect.tryPromise({
-			try: () => env.CACHE_KV.get<string>(`DEPLOY:${host}`),
+			try: () => env.CACHE_KV.get<string>(`DEPLOYMENT:${host}`),
 			catch: (err) => new Error(`Failed to get deployment ID from KV: ${String(err)}`)
 		});
 
@@ -62,32 +62,6 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		
 		if (cachedResponse) {
 			console.log("Cache hit for:", cacheKey);
-			
-			const originResponse = yield* Effect.tryPromise({
-				try: () => fetch(env.ORIGIN_URL + url.pathname, {
-					headers: request.headers
-				}),
-				catch: (error) => new Error(`Origin fetch failed: ${error}`)
-			});
-
-			const versionCheck = yield* detectVersionMismatch(
-				originResponse,
-				env.CACHE_KV,
-			);
-
-			if (versionCheck.shouldRevalidate && versionCheck.wantVersion) {
-				console.log("Version mismatch detected, triggering background revalidation");
-				ctx.waitUntil(
-					triggerRevalidation(env, {
-						cachePrefix,
-						deploymentId: versionCheck.wantVersion,
-						originUrl: env.ORIGIN_URL,
-						projectId,
-						domain: host
-					})
-				);
-			}
-
 			return cachedResponse;
 		}
 
@@ -103,7 +77,7 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		// this is basicallyt cache miss and i set it here
 
 		const versionCheck = yield* detectVersionMismatch(
-			originResponse,
+			originResponse.clone(),
 			env.CACHE_KV,
 		);
 		console.log("Version check result:", versionCheck);
