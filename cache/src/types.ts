@@ -29,7 +29,7 @@ export interface Env {
 }
 
 export interface PrewarmRequest {
-  paths: string[];
+  paths?: string[];
   cachePrefix: string;
   deploymentId: string;
   isPrewarm: boolean;

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-WEBHOOK_URL="${WEBHOOK_URL:-http://localhost:8787/webhook/deployment}"
+WEBHOOK_URL="${WEBHOOK_URL:-https://cache.wishee.workers.dev/webhook/deployment}"
 DEPLOY_DIR="${1:-.}"
 TEAM_ID="${VERCEL_TEAM_ID:-}"
 
