@@ -10,7 +10,9 @@
 		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
 		"upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
 		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
+		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+		"vercel:prod": "../deploy.sh .",
+		"vercel:prod:webhook": "vercel --prod && node -e \"fetch('http://localhost:8787/webhook/deployment', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'deployment.created',payload:{team:null,user:{id:'local'},alias:[],deployment:{id:Date.now().toString(),meta:{},url:'',name:'nextjs-docs'},links:{deployment:'',project:''},target:'production',project:{id:'default_project'},plan:'hobby',regions:['iad1']}})}).then(r=>r.json()).then(console.log)\""
 	},
 	"dependencies": {
 		"@opennextjs/cloudflare": "^1.14.4",
