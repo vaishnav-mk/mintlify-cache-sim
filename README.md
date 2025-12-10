@@ -4,6 +4,9 @@ WIP reproduction of [mintlify's edge caching architecture](https://www.mintlify.
 
 a solid write-up on how mintlify uses cloudflare and vercel together got me curious, so i recreated their architecture based on that blog. the mintlify team has been super helpful and this is my take on the same approach with a little bit of ✨ [Effect](https://effect.website/) ✨ magic
 
+pretty cool architecture from their blog:
+<img src="https://www.mintlify.com/images/page-speed-improvements-cf-arch.png" alt="pretty cool architecture from their blog" width=900>
+
 took a couple of liberties
 - blog approach: cloudflare queues → this repo: durable objects → queues need paid plan & im bork
 - blog approach: separate workers → this repo: single worker → simpler as i cant scale to mintlify
