@@ -1,4 +1,4 @@
-# mintlify-cache-sim
+# mintlify-cache-sim (all on top of [cloudflare workers](https://developers.cloudflare.com/workers/))
 
 WIP reproduction of [mintlify's edge caching architecture](https://www.mintlify.com/blog/page-speed-improvements) (still WIP and im fixing logical bugs)
 
