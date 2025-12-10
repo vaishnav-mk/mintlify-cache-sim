@@ -7,7 +7,8 @@ export function buildCacheKey(
     path: string,
     contentType: ContentType
 ): string {
-    return `${prefix}/${deploymentId}/${path}#:${contentType}`;
+    // Blog examples: acme/dpl_abc123/getting-started:html, acme/dpl_abc123/getting-started:rsc
+    return `${prefix}/${deploymentId}${path}:${contentType}`;
 }
 
 export function chunks<T>(array: Array<T>, size: number): Array<Array<T>> {

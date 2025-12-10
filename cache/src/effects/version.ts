@@ -1,25 +1,27 @@
 import { Effect } from "effect";
 import type { Env } from "../types";
+import { deployExpectedVersionKey, deploymentActiveKey } from "../keys";
 
 // refer: https://www.mintlify.com/blog/page-speed-improvements#2-automatic-version-detection-and-revalidation
 
 export const getExpectedVersion = (kv: KVNamespace, projectId: string): Effect.Effect<string | null, Error> => {
   return Effect.tryPromise({
-    try: () => kv.get<string>(`DEPLOY:${projectId}:id`),
+    try: () => kv.get<string>(deployExpectedVersionKey(projectId)),
     catch: (error) => new Error(`Failed to get expected version: ${String(error)}`),
   });
 }
 
 export const setExpectedVersion = (kv: KVNamespace, projectId: string, deploymentId: string): Effect.Effect<void, Error> => {
   return Effect.tryPromise({
-    try: () => kv.put(`DEPLOY:${projectId}:id`, deploymentId),
+    try: () => kv.put(deployExpectedVersionKey(projectId), deploymentId),
     catch: (error) => new Error(`Failed to set expected version: ${String(error)}`),
   });
 }
 
 export const setDeploymentVersion = (kv: KVNamespace, domain: string, deploymentId: string): Effect.Effect<void, Error> => {
+  // Blog: updates the DEPLOYMENT:{domain} key in KV for all connected domains
   return Effect.tryPromise({
-    try: () => kv.put(`DEPLOY:${domain}`, deploymentId),
+    try: () => kv.put(deploymentActiveKey(domain), deploymentId),
     catch: (error) => new Error(`Failed to set deployment version: ${String(error)}`),
   });
 }

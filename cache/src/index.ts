@@ -4,6 +4,7 @@ import { RevalidationCoordinator } from "./coordinator";
 import { detectVersionMismatch } from "./effects/version";
 import { getCachedResponse, setCachedResponse } from "./effects/cache";
 import { buildCacheKey } from "./utils";
+import { configOriginKey, configPrefixKey, configProjectKey, deployExpectedVersionKey, deploymentActiveKey } from "./keys";
 import type { Env, DeploymentConfig, PrewarmRequest } from "./types";
 import { CACHE_TTL_SECONDS } from "./constants";
 import { handleDeploymentWebhook } from "./handlers/webhook";
@@ -35,12 +36,26 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		
 		console.log("Handling request for host:", host, "path:", url.pathname);
 
-		const cachePrefix = "docs";
-		const projectId = "default_project"; // TODO: multi project support later
+		// this is for multiple tenants, im assuming mintlify is doing something similar as well
+		const cachePrefix = (yield* Effect.tryPromise({
+			try: () => env.CACHE_KV.get<string>(configPrefixKey(host)),
+			catch: (err) => new Error(`Failed to get cache prefix: ${String(err)}`)
+		})) ?? "docs";
 
-		console.log("Using cache prefix:", cachePrefix, "and project ID:", projectId);
+		const projectId = (yield* Effect.tryPromise({
+			try: () => env.CACHE_KV.get<string>(configProjectKey(host)),
+			catch: (err) => new Error(`Failed to get project ID: ${String(err)}`)
+		})) ?? "default_project";
+
+		const originUrl = (yield* Effect.tryPromise({
+			try: () => env.CACHE_KV.get<string>(configOriginKey(host)),
+			catch: (err) => new Error(`Failed to get origin URL: ${String(err)}`)
+		})) ?? env.ORIGIN_URL;
+
+		console.log("Multi-tenant config - prefix:", cachePrefix, "projectId:", projectId, "origin:", originUrl);
+
 		const deploymentId = yield* Effect.tryPromise({
-			try: () => env.CACHE_KV.get<string>(`DEPLOYMENT:${host}`),
+			try: () => env.CACHE_KV.get<string>(deploymentActiveKey(host)),
 			catch: (err) => new Error(`Failed to get deployment ID from KV: ${String(err)}`)
 		});
 
@@ -50,7 +65,9 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 			// ig this is when there are no deployments so it'll just proxy to origin
 			console.log("No deployment ID found, proxying to origin");
 			return yield* Effect.tryPromise({
-				try: () => fetch(env.ORIGIN_URL + url.pathname),
+				try: () => fetch(originUrl + url.pathname, {
+					headers: request.headers
+				}),
 				catch: (err) => new Error(`Failed to proxy to origin: ${String(err)}`)
 			});
 		}
@@ -68,32 +85,38 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		console.log("Cache miss for:", cacheKey);
 
 		const originResponse = yield* Effect.tryPromise({
-			try: () => fetch(env.ORIGIN_URL + url.pathname, {
+			try: () => fetch(originUrl + url.pathname, {
 				headers: request.headers
 			}),
 			catch: (error) => new Error(`Origin fetch failed: ${error}`)
 		});
 
-		// this is basicallyt cache miss and i set it here
+		// mintlify seems to do some version mismatch detection here as well
+		const gotVersion = originResponse.headers.get("x-version");
+		const originProjectId = originResponse.headers.get("x-vercel-project-id");
 
-		const versionCheck = yield* detectVersionMismatch(
-			originResponse.clone(),
-			env.CACHE_KV,
-		);
-		console.log("Version check result:", versionCheck);
+		// this is to compare against expected version from webhook (DEPLOY:{projectId}:id)
+		if (gotVersion && originProjectId) {
+			const wantVersion = yield* Effect.tryPromise({
+				try: () => env.CACHE_KV.get<string>(deployExpectedVersionKey(originProjectId)),
+				catch: (err) => new Error(`Failed to get expected version: ${String(err)}`)
+			});
 
-		if (versionCheck.shouldRevalidate && versionCheck.wantVersion) {
-			console.log("Version mismatch detected, triggering revalidation");
-			// this is bg revalidation trigger (no queueing for now cause im broke)
-			ctx.waitUntil(
-				triggerRevalidation(env, {
-					cachePrefix,
-					deploymentId: versionCheck.wantVersion,
-					originUrl: env.ORIGIN_URL,
-					projectId,
-					domain: host
-				})
-			);
+			const shouldRevalidate = wantVersion !== null && wantVersion !== gotVersion;
+			
+			if (shouldRevalidate) {
+				console.log("Version mismatch detected - got:", gotVersion, "want:", wantVersion);
+				// this is bg revalidation trigger (no queueing for now cause im broke)
+				ctx.waitUntil(
+					triggerRevalidation(env, {
+						cachePrefix,
+						deploymentId: wantVersion!,
+						originUrl,
+						projectId: originProjectId,
+						domain: host
+					})
+				);
+			}
 		}
 
 		if (originResponse.ok) {

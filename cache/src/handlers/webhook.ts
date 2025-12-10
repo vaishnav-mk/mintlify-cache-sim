@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import type { Env, WebhookRequest } from "../types";
+import { deployExpectedVersionKey } from "../keys";
 
 export async function handleDeploymentWebhook(request: Request, env: Env): Promise<Response> {
   const program = Effect.gen(function* () {
@@ -10,9 +11,10 @@ export async function handleDeploymentWebhook(request: Request, env: Env): Promi
 
     const projectId = body.payload.project.id;
     const deploymentId = body.payload.deployment.id;
+    console.log("Webhook: Received deployment webhook for project:", projectId, "deploymentId:", deploymentId);
 
     yield* Effect.tryPromise({
-      try: () => env.CACHE_KV.put(`DEPLOY:${projectId}:id`, deploymentId),
+      try: () => env.CACHE_KV.put(deployExpectedVersionKey(projectId), deploymentId),
       catch: (error) => new Error(`Failed to write deployment ID to KV: ${error}`)
     });
 
