@@ -91,6 +91,17 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 
 		console.log("Cache miss for:", cacheKey);
 
+		console.log("Triggering background revalidation for all pages");
+		ctx.waitUntil(
+			triggerRevalidation(env, {
+				cachePrefix,
+				deploymentId,
+				originUrl,
+				projectId,
+				domain: host
+			})
+		);
+
 		const originResponse = yield* Effect.tryPromise({
 			try: () => fetch(originUrl + url.pathname, {
 				headers: request.headers
@@ -98,31 +109,20 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 			catch: (error) => new Error(`Origin fetch failed: ${error}`)
 		});
 
-		// mintlify seems to do some version mismatch detection here as well
+		// mintlify seems to do some version mismatch detection here as well for mid-deployment cache misses
 		const gotVersion = originResponse.headers.get("x-version");
 		const originProjectId = originResponse.headers.get("x-vercel-project-id");
 
-		// this is to compare against expected version from webhook (DEPLOY:{projectId}:id)
 		if (gotVersion && originProjectId) {
 			const wantVersion = yield* Effect.tryPromise({
 				try: () => env.CACHE_KV.get<string>(deployExpectedVersionKey(originProjectId)),
 				catch: (err) => new Error(`Failed to get expected version: ${String(err)}`)
 			});
 
-			const shouldRevalidate = wantVersion !== null && wantVersion !== gotVersion;
-			
-			if (shouldRevalidate) {
+			// if version mismatch, we already triggered revalidation above
+			// but log it for debugging
+			if (wantVersion !== null && wantVersion !== gotVersion) {
 				console.log("Version mismatch detected - got:", gotVersion, "want:", wantVersion);
-				// this is bg revalidation trigger (no queueing for now cause im broke)
-				ctx.waitUntil(
-					triggerRevalidation(env, {
-						cachePrefix,
-						deploymentId: wantVersion!,
-						originUrl,
-						projectId: originProjectId,
-						domain: host
-					})
-				);
 			}
 		}
 
