@@ -79,7 +79,14 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 		
 		if (cachedResponse) {
 			console.log("Cache hit for:", cacheKey);
-			return cachedResponse;
+
+			const headers = new Headers(cachedResponse.headers);
+			headers.set("X-Cache-Status", "HIT");
+			return new Response(cachedResponse.body, {
+				status: cachedResponse.status,
+				statusText: cachedResponse.statusText,
+				headers
+			});
 		}
 
 		console.log("Cache miss for:", cacheKey);
@@ -133,7 +140,13 @@ async function handleProxy(request: Request, env: Env, ctx: ExecutionContext): P
 			yield* setCachedResponse(cacheKey, cacheable);
 		}
 
-		return originResponse;
+		const responseHeaders = new Headers(originResponse.headers);
+		responseHeaders.set("X-Cache-Status", "MISS");
+		return new Response(originResponse.body, {
+			status: originResponse.status,
+			statusText: originResponse.statusText,
+			headers: responseHeaders
+		});
 	})
 
 	return Effect.runPromise(program);
